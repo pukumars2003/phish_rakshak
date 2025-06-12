@@ -6,7 +6,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Correct Gradio Space endpoint
-SPACE_API_URL = "https://ajay1311-cyberswaraksha.hf.space/api/predict"
+SPACE_API_URL = "https://ajay1311-cyberswaraksha.hf.space"
 
 # Hugging Face Space function name
 API_NAME = "/analyze_phishing"
