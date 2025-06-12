@@ -1,25 +1,38 @@
 from flask import Flask, request, jsonify
-from gradio_client import Client
 from flask_cors import CORS
+import httpx
 
 app = Flask(__name__)
 CORS(app)
 
-# Hugging Face Space client
-client = Client("Ajay1311/CyberSwaRaksha")
+# Correct Gradio Space endpoint
+SPACE_API_URL = "https://ajay1311-cyberswaraksha.hf.space/api/predict"
 
-def predict_with_timeout(input_text, timeout=30.0):
+# Hugging Face Space function name
+API_NAME = "/analyze_phishing"
+
+def predict_via_httpx(input_text, timeout=30.0):
+    """
+    Call Hugging Face Space using direct HTTP POST to /api/predict.
+    """
+    payload = {
+        "data": [input_text],
+        "fn_index": 0  # Can be dynamic, but usually 0 for the first function
+    }
+
     try:
-        # Call the model using positional argument
-        result = client.predict(input_text, api_name="/analyze_phishing")
-        return result
+        response = httpx.post(SPACE_API_URL, json=payload, timeout=timeout)
+        response.raise_for_status()
+        data = response.json().get("data", [])
+        if len(data) == 3:
+            return tuple(data)
     except Exception as e:
-        print(f"Error calling Gradio model: {e}")
+        print("Error calling HF Space via httpx:", e)
         return None
 
 @app.route('/', methods=['GET'])
 def index():
-    return "Phishing Detection API is live!", 200
+    return "Phishing Detection API is live on Render!", 200
 
 @app.route('/analyze_phishing', methods=['POST'])
 def analyze_phishing():
@@ -29,7 +42,7 @@ def analyze_phishing():
     if not input_text:
         return jsonify({"error": "No input text provided"}), 400
 
-    result = predict_with_timeout(input_text)
+    result = predict_via_httpx(input_text)
     if result is None:
         return jsonify({"error": "Prediction failed. Try again later."}), 500
 
