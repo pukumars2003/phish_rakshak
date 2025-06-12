@@ -5,8 +5,8 @@ import httpx
 app = Flask(__name__)
 CORS(app)
 
-# Your Hugging Face Space inference endpoint
-SPACE_URL = "https://ajay1311-cyberswaraksha.hf.space/run/analyze_phishing"
+# ✅ Corrected Hugging Face endpoint (NOT /run/)
+SPACE_URL = "https://ajay1311-cyberswaraksha.hf.space/analyze_phishing"
 
 @app.route('/', methods=['GET'])
 def index():
@@ -14,18 +14,23 @@ def index():
 
 def predict_via_space(input_text: str, timeout: float = 30.0):
     """
-    Posts to the Gradio Space HTTP endpoint. Returns
+    Posts to the correct Hugging Face Space HTTP endpoint. Returns
     a tuple (summary, confidence, detail) or None on error.
     """
-    payload = {"data": [input_text]}
     try:
-        resp = httpx.post(SPACE_URL, json=payload, timeout=timeout)
+        # Use form-style parameters for Spaces with named endpoints
+        resp = httpx.post(SPACE_URL, data={"text": input_text}, timeout=timeout)
         resp.raise_for_status()
         js = resp.json()
-        # Gradio Spaces returns { "data": [out1, out2, out3], ... }
+        
+        if isinstance(js, list) and len(js) == 3:
+            return tuple(js)
+        
+        # If Gradio wraps data in {"data": [...]}
         outputs = js.get("data", [])
         if len(outputs) == 3:
             return tuple(outputs)
+        
     except Exception as e:
         print("Error calling Space:", e)
     return None
@@ -48,4 +53,4 @@ def analyze_phishing():
         "detailed_analysis": detailed_analysis
     })
 
-# No app.run(): use gunicorn app:app on Render
+# No app.run(): Use gunicorn app:app on Render
