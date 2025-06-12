@@ -5,6 +5,7 @@ from gradio_client import Client
 app = Flask(__name__)
 CORS(app)
 
+# Connect to your Hugging Face Space
 client = Client("Ajay1311/CyberSwaRaksha")
 
 @app.route('/', methods=['GET'])
@@ -19,8 +20,9 @@ def analyze_phishing():
         return jsonify({"error": "No input text provided"}), 400
 
     try:
+        # Use positional argument instead of keyword argument
         detection_summary, confidence_meter, detailed_analysis = client.predict(
-            text=input_text,
+            input_text,  # <--- Correct way
             api_name="/analyze_phishing"
         )
     except Exception as e:
