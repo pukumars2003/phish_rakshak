@@ -2,6 +2,8 @@ services:
   - type: web
     name: phish rakshak
     env: python
-    buildCommand: ""
-    startCommand: "python app.py"
     plan: free
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -b 0.0.0.0:$PORT app:app
+    autoDeploy: true
