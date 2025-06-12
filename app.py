@@ -1,12 +1,21 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS
 from gradio_client import Client
+from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
 
-# Connect to your Hugging Face Space
+# Hugging Face Space client
 client = Client("Ajay1311/CyberSwaRaksha")
+
+def predict_with_timeout(input_text, timeout=30.0):
+    try:
+        # Call the model using positional argument
+        result = client.predict(input_text, api_name="/analyze_phishing")
+        return result
+    except Exception as e:
+        print(f"Error calling Gradio model: {e}")
+        return None
 
 @app.route('/', methods=['GET'])
 def index():
@@ -14,20 +23,17 @@ def index():
 
 @app.route('/analyze_phishing', methods=['POST'])
 def analyze_phishing():
-    data = request.get_json() or {}
+    data = request.get_json()
     input_text = data.get('text', '').strip()
+    
     if not input_text:
         return jsonify({"error": "No input text provided"}), 400
 
-    try:
-        # Use positional argument instead of keyword argument
-        detection_summary, confidence_meter, detailed_analysis = client.predict(
-            input_text,  # <--- Correct way
-            api_name="/analyze_phishing"
-        )
-    except Exception as e:
-        print("Error calling Space via gradio_client:", e)
-        return jsonify({"error": "Prediction failed"}), 500
+    result = predict_with_timeout(input_text)
+    if result is None:
+        return jsonify({"error": "Prediction failed. Try again later."}), 500
+
+    detection_summary, confidence_meter, detailed_analysis = result
 
     return jsonify({
         "detection_summary": detection_summary,
