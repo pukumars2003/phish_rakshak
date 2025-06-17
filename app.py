@@ -17,7 +17,7 @@ def connect_to_hf_space(url, max_attempts=5, delay=3):
         except Exception as e:
             print(f"Attempt {attempt} failed: {e}")
             time.sleep(delay)
-    raise Exception("❌ Failed to connect to Hugging Face Space after multiple attempts.")
+    raise Exception("❌ Failed to connect to Hugging Face Space after multiple attempts.",e,url)
 
 client = connect_to_hf_space(HF_SPACE_URL)
 
