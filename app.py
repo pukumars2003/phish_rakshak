@@ -1,53 +1,23 @@
-from flask import Flask, request, jsonify
+import os
 from gradio_client import Client
-from flask_cors import CORS
-import time
 
-# Initialize Flask app and enable CORS for cross-origin requests
-app = Flask(__name__)
-CORS(app)
+def main():
+    # Your token should be stored in environment variables for safety
+    HF_TOKEN = os.getenv("HF_TOKEN", "cb1c9f744ed6d9e4eea6465dfddc1bdb")  # fallback for demo
 
-# Initialize Gradio Client for CyberSwaRaksha model
-client = Client("Ajay1311/CyberSwaRaksha")
-
-# Custom function to handle timeouts manually
-def predict_with_timeout(input_text, timeout=30.0):
-    start_time = time.time()
     try:
-        # Make the prediction call to the model API
-        result = client.predict(
-            text=input_text,
-            api_name="/analyze_phishing"
-        )
-        return result
+        # Initialize the client with your token
+        client = Client("Ajay1311/CyberSwaRaksha", hf_token=HF_TOKEN)
+
+        # Example input to your Space
+        input_data = "Hello from app.py!"
+
+        # Call the predict method, adjust function name & inputs as needed
+        output = client.predict(input_data)
+
+        print("Output from the Space:", output)
     except Exception as e:
-        
-        print(f"Error during prediction: {e}")
-        if time.time() - start_time > timeout:
-            print("Request timed out")
-        return None
+        print("Error during call to the Space:", e)
 
-@app.route('/analyze_phishing', methods=['POST'])
-def analyze_phishing():
-    data = request.get_json()
-    input_text = data.get('text')
-
-    if not input_text:
-        return jsonify({"error": "No input text provided"}), 400
-
-    # Attempt to get the result from the Gradio model
-    result = predict_with_timeout(input_text, timeout=30.0)
-
-    if result is None:
-        return jsonify({"error": "Request timed out or failed. Please try again later."}), 500
-
-    detection_summary, confidence_meter, detailed_analysis = result
-
-    return jsonify({
-        "detection_summary": detection_summary,
-        "confidence_meter": confidence_meter,
-        "detailed_analysis": detailed_analysis
-    })
-
-if __name__ == '__main__':
-    app.run(debug=True, host="0.0.0.0", port=5000)
+if __name__ == "__main__":
+    main()
