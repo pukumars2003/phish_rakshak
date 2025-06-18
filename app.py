@@ -1,23 +1,27 @@
-import os
 from gradio_client import Client
+import os
 
-def main():
-    # Your token should be stored in environment variables for safety
-    HF_TOKEN = os.getenv("HF_TOKEN", "cb1c9f744ed6d9e4eea6465dfddc1bdb")  # fallback for demo
+# Initialize the client without a token (only works if the Space is public)
+client = Client("Ajay1311/CyberSwaRaksha")
 
-    try:
-        # Initialize the client with your token
-        client = Client("Ajay1311/CyberSwaRaksha", hf_token=HF_TOKEN)
+# Input text (simulate phishing or safe message)
+input_text = "Please verify your account by clicking this link: http://bit.ly/fake-login"
 
-        # Example input to your Space
-        input_data = "Hello from app.py!"
+# Run prediction using the default function (only one function in your Space)
+try:
+    result_summary, result_plot, result_analysis = client.predict(
+        input_text,  # input
+        api_name="/predict"  # use the default function route
+    )
 
-        # Call the predict method, adjust function name & inputs as needed
-        output = client.predict(input_data)
+    print("=== Detection Summary ===")
+    print(result_summary)
 
-        print("Output from the Space:", output)
-    except Exception as e:
-        print("Error during call to the Space:", e)
+    print("\n=== Detailed Analysis ===")
+    print(result_analysis)
 
-if __name__ == "__main__":
-    main()
+    print("\n=== Plot Info ===")
+    print("Plot object returned:", type(result_plot))
+
+except Exception as e:
+    print("Error occurred while calling the Space:", e)
