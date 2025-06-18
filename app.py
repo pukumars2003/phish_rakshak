@@ -1,116 +1,58 @@
-import gradio as gr
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib
-from transformers import pipeline
+import logging
+from flask import Flask, request, jsonify
+from gradio_client import Client
+from flask_cors import CORS
+import time
 
-matplotlib.use('Agg')
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
 
-# Load model using Hugging Face
-model = pipeline('text-classification', model="Ajay1311/phish")
+# Initialize Flask app and enable CORS for cross-origin requests
+app = Flask(__name__)
+CORS(app)
 
-def create_speedometer_chart(confidence, is_phishing):
-    fig, ax = plt.subplots(figsize=(6, 3), subplot_kw={'projection': 'polar'})
+# Initialize Gradio Client for CyberSwaRaksha model
+client = Client("Ajay1311/CyberSwaRaksha")
 
-    confidence_pct = confidence * 100
-    theta = np.linspace(np.pi, 0, 100)
-    ax.plot(theta, [1]*100, color='lightgray', linewidth=15, alpha=0.3)
-
-    angle = np.pi * (1 - (confidence_pct / 100))
-    ax.plot([np.pi, angle], [0, 1], color='red' if is_phishing else 'green', linewidth=4)
-
-    ax.fill_between(theta, 0, 1, where=(theta >= angle), color='red' if is_phishing else 'green', alpha=0.25)
-
-    ax.set_rticks([])
-    ax.set_xticks([])
-    ax.set_yticklabels([])
-    ax.set_facecolor("white")
-    ax.spines['polar'].set_visible(False)
-    ax.set_ylim(0, 1.1)
-
-    label = f"{'PHISHING' if is_phishing else 'BENIGN'}\n{confidence_pct:.1f}%"
-    ax.text(0, -0.2, label, ha='center', va='center', fontsize=14, fontweight='bold', color='black')
-
-    return fig
-
-def analyze_phishing(text):
-    if not text.strip():
-        return "No input provided.", None, "Please enter valid email or URL content for analysis."
-    
-    result = model(text)
-    label = result[0]['label']
-    score = result[0]['score']
-    is_phishing = label.lower() == 'phishing'
-    chart = create_speedometer_chart(score, is_phishing)
-
-    if is_phishing:
-        analysis = f"""
-        ⚠️ **Phishing Likely Detected**  
-        The provided input has characteristics associated with phishing content.  
-        **Confidence:** {score*100:.1f}%
-        
-        **Indicators of phishing may include:**
-        - Suspicious or misspelled URLs
-        - Requests for personal credentials
-        - Unusual urgency or threats
-        - Unexpected attachments or links
-        **Recommendation:** Do not interact with the content until verified by your IT or security team.
-        """
-    else:
-        analysis = f"""
-        ✅ **No Threat Detected**  
-        The content appears legitimate based on the current model.  
-        **Confidence:** {score*100:.1f}%
-        
-        **General Safety Tips:**
-        - Avoid clicking unknown links
-        - Be cautious with personal data
-        - Always confirm requests from unknown senders
-        **Recommendation:** Proceed with standard caution.
-        """
-
-    return f"{'Phishing Detected' if is_phishing else 'Content Safe'} (Confidence: {score*100:.1f}%)", chart, analysis
-
-theme = gr.themes.Soft(primary_hue="blue", secondary_hue="gray").set(
-    button_primary_background_fill="*primary_600",
-    button_primary_text_color="white",
-    block_label_background_fill="*neutral_100",
-    block_title_text_color="*primary_600",
-)
-
-with gr.Blocks(theme=theme, css=""".container { max-width: 800px; margin: 0 auto; }""") as demo:
-    with gr.Column(elem_classes="container"):
-        gr.HTML("""<div class="header"><h1>Cyber Swa Raksha</h1><p>Protect From Phishing By Yourself</p></div>""")
-        
-        with gr.Group():
-            input_text = gr.Textbox(
-                placeholder="Enter email content, message, or suspicious URL...",
-                lines=4,
-                label="Input Text"
-            )
-        
-        with gr.Row():
-            analyze_btn = gr.Button("Analyze", variant="primary")
-            clear_btn = gr.Button("Clear")
-        
-        with gr.Group():
-            result_text = gr.Textbox(label="Detection Summary", elem_classes="result-box")
-            result_plot = gr.Plot(label="Confidence Meter")
-            analysis_md = gr.Markdown(label="Detailed Analysis")
-
-        analyze_btn.click(
-            analyze_phishing,
-            inputs=input_text,
-            outputs=[result_text, result_plot, analysis_md]
+# Custom function to handle timeouts manually with logging
+def predict_with_timeout(input_text, timeout=60.0):  # Increased timeout to 60 seconds
+    start_time = time.time()
+    try:
+        logging.debug("Sending prediction request to Gradio Space...")
+        result = client.predict(
+            text=input_text,
+            api_name="/analyze_phishing"
         )
+        logging.debug("Received response from Gradio Space.")
+        return result
+    except Exception as e:
+        logging.error(f"Error during prediction: {e}")
+        if time.time() - start_time > timeout:
+            logging.warning("Request timed out")
+        return None
 
-        clear_btn.click(
-            lambda: ("", None, ""),
-            inputs=None,
-            outputs=[input_text, result_plot, analysis_md]
-        )
+@app.route('/analyze_phishing', methods=['POST'])
+def analyze_phishing():
+    data = request.get_json()
+    input_text = data.get('text')
 
-        gr.HTML("""<div class="footer">Cyber Swa Raksha</div>""")
+    if not input_text:
+        return jsonify({"error": "No input text provided"}), 400
 
-if __name__ == "__main__":
-    demo.launch(share=True)
+    # Attempt to get the result from the Gradio model
+    logging.debug("Processing request for phishing analysis...")
+    result = predict_with_timeout(input_text, timeout=60.0)
+
+    if result is None:
+        return jsonify({"error": "Request timed out or failed. Please try again later."}), 500
+
+    detection_summary, confidence_meter, detailed_analysis = result
+
+    return jsonify({
+        "detection_summary": detection_summary,
+        "confidence_meter": confidence_meter,
+        "detailed_analysis": detailed_analysis
+    })
+
+if __name__ == '__main__':
+    app.run(debug=True, host="0.0.0.0", port=5000)
