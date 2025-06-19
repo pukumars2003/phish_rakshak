@@ -4,6 +4,7 @@ from gradio_client import Client
 from flask_cors import CORS
 import time
 import os
+from urllib.parse import urlparse
 
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
@@ -18,8 +19,16 @@ client = Client("Ajay1311/CyberSwaRaksha")
 
 # ------------------ SAFE URL CHECK ------------------ #
 def normalize_url(url):
-    """Normalize URLs by stripping trailing slashes and lowercasing."""
-    return url.rstrip("/").lower()
+    """Normalize by lowercasing, removing www., and stripping trailing slashes."""
+    try:
+        parsed = urlparse(url.lower().rstrip("/"))
+        hostname = parsed.hostname or ""
+        if hostname.startswith("www."):
+            hostname = hostname[4:]
+        return f"{parsed.scheme}://{hostname}"
+    except Exception as e:
+        logging.error(f"URL normalization error: {e}")
+        return url.lower().rstrip("/")
 
 def is_safe_url(url):
     normalized_input = normalize_url(url)
