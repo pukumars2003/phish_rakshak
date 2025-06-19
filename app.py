@@ -30,6 +30,7 @@ def normalize_url(url):
         logging.error(f"URL normalization error: {e}")
         return url.lower().rstrip("/")
 
+
 def is_safe_url(url):
     normalized_input = normalize_url(url)
     filepath = os.path.join(os.path.dirname(__file__), "safe_urls.txt")
@@ -89,15 +90,25 @@ def analyze_phishing():
     logging.debug(f"📥 Received URL: {input_text}")
     logging.debug("🔍 Checking if URL is in safe list...")
 
+    # ✅ SAFE LIST RESPONSE
     if is_safe_url(input_text):
         logging.info("✅ URL is in safe list. Skipping model prediction.")
         return jsonify({
-            "detection_summary": "This website is verified as SAFE (based on safe list).",
-            "confidence_meter": "100% Safe",
-            "detailed_analysis": "This URL matches a trusted domain in our safe list. No further analysis is needed."
+            "detection_summary": "Content Safe (Confidence: 100.0%)",
+            "confidence_meter": "100.0%",
+            "detailed_analysis": (
+                "✅ No Threat Detected. This URL is listed in the trusted safe list.\n\n"
+                "**Confidence:** 100.0%\n\n"
+                "**General Safety Tips:**\n"
+                "- Avoid clicking unknown links\n"
+                "- Be cautious with personal data\n"
+                "- Always confirm requests from unknown senders\n\n"
+                "**Recommendation:**\n"
+                "Proceed with standard caution."
+            )
         })
 
-    # Not in safe list — analyze
+    # 🔍 GRADIO PREDICTION RESPONSE
     result = predict_with_timeout(input_text, timeout=60.0)
     if result is None:
         return jsonify({"error": "Request timed out or failed. Please try again later."}), 500
