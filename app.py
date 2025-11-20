@@ -19,35 +19,20 @@ client = Client("Ajay1311/CyberSwaRaksha")
 
 # ------------------ SAFE URL CHECK ------------------ #
 def normalize_url(url):
-    """
-    Normalize URL to compare only domain names:
-    - lowercase
-    - remove www.
-    - extract only hostname (ignore scheme, path, query)
-    """
+    """Normalize by lowercasing, removing www., and stripping trailing slashes."""
     try:
-        url = url.strip().lower()
-
-        # Parse URL normally
-        parsed = urlparse(url)
-        hostname = parsed.hostname
-
-        # Handle raw domain inputs like "google.com"
-        if not hostname:
-            hostname = url.split('/')[0]
-
+        parsed = urlparse(url.lower().rstrip("/"))
+        hostname = parsed.hostname or ""
         if hostname.startswith("www."):
             hostname = hostname[4:]
-
-        return hostname
-
+        return f"{parsed.scheme}://{hostname}"
     except Exception as e:
         logging.error(f"URL normalization error: {e}")
-        return url.lower().strip()
+        return url.lower().rstrip("/")
 
 
 def is_safe_url(url):
-    input_domain = normalize_url(url)
+    normalized_input = normalize_url(url)
     filepath = os.path.join(os.path.dirname(__file__), "safe_urls.txt")
 
     try:
@@ -56,16 +41,15 @@ def is_safe_url(url):
             return False
 
         with open(filepath, "r") as f:
-            safe_domains = [normalize_url(line.strip()) for line in f if line.strip()]
+            safe_urls = [normalize_url(line.strip()) for line in f if line.strip()]
 
-        if not safe_domains:
+        if not safe_urls:
             logging.warning("safe_urls.txt is empty.")
             return False
 
-        for safe_domain in safe_domains:
-            # Exact match OR subdomain match
-            if input_domain == safe_domain or input_domain.endswith("." + safe_domain):
-                logging.info(f"✅ URL matched safe list entry: {safe_domain}")
+        for safe_url in safe_urls:
+            if normalized_input.startswith(safe_url):
+                logging.info(f"✅ URL matched safe list entry: {safe_url}")
                 return True
 
         logging.info(f"❌ No safe list match for URL: {url}")
@@ -94,9 +78,11 @@ def predict_with_timeout(input_text, timeout=60.0):
         return None
 
 
-# ------------------ API ROUTE ------------------ #
+# ------------------ API ROUTES ------------------ #
+
 @app.route('/analyze_phishing', methods=['POST'])
 def analyze_phishing():
+    """Endpoint for URL analysis (includes safe list check)"""
     data = request.get_json()
     input_text = data.get('text')
 
@@ -123,6 +109,32 @@ def analyze_phishing():
                 "Proceed with standard caution."
             )
         })
+
+    # 🔍 GRADIO PREDICTION RESPONSE
+    result = predict_with_timeout(input_text, timeout=60.0)
+    if result is None:
+        return jsonify({"error": "Request timed out or failed. Please try again later."}), 500
+
+    detection_summary, confidence_meter, detailed_analysis = result
+
+    return jsonify({
+        "detection_summary": detection_summary,
+        "confidence_meter": confidence_meter,
+        "detailed_analysis": detailed_analysis
+    })
+
+
+@app.route('/analyze_message', methods=['POST'])
+def analyze_message():
+    """Endpoint for Message/Text analysis (SKIPS safe list check)"""
+    data = request.get_json()
+    input_text = data.get('text')
+
+    if not input_text:
+        return jsonify({"error": "No input text provided"}), 400
+
+    logging.debug(f"📥 Received Message: {input_text}")
+    logging.debug("⏩ Skipping safe list check for message content.")
 
     # 🔍 GRADIO PREDICTION RESPONSE
     result = predict_with_timeout(input_text, timeout=60.0)
