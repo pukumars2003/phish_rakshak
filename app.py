@@ -19,20 +19,35 @@ client = Client("Ajay1311/CyberSwaRaksha")
 
 # ------------------ SAFE URL CHECK ------------------ #
 def normalize_url(url):
-    """Normalize by lowercasing, removing www., and stripping trailing slashes."""
+    """
+    Normalize URL to compare only domain names:
+    - lowercase
+    - remove www.
+    - extract only hostname (ignore scheme, path, query)
+    """
     try:
-        parsed = urlparse(url.lower().rstrip("/"))
-        hostname = parsed.hostname or ""
+        url = url.strip().lower()
+
+        # Parse URL normally
+        parsed = urlparse(url)
+        hostname = parsed.hostname
+
+        # Handle raw domain inputs like "google.com"
+        if not hostname:
+            hostname = url.split('/')[0]
+
         if hostname.startswith("www."):
             hostname = hostname[4:]
-        return f"{parsed.scheme}://{hostname}"
+
+        return hostname
+
     except Exception as e:
         logging.error(f"URL normalization error: {e}")
-        return url.lower().rstrip("/")
+        return url.lower().strip()
 
 
 def is_safe_url(url):
-    normalized_input = normalize_url(url)
+    input_domain = normalize_url(url)
     filepath = os.path.join(os.path.dirname(__file__), "safe_urls.txt")
 
     try:
@@ -41,15 +56,16 @@ def is_safe_url(url):
             return False
 
         with open(filepath, "r") as f:
-            safe_urls = [normalize_url(line.strip()) for line in f if line.strip()]
+            safe_domains = [normalize_url(line.strip()) for line in f if line.strip()]
 
-        if not safe_urls:
+        if not safe_domains:
             logging.warning("safe_urls.txt is empty.")
             return False
 
-        for safe_url in safe_urls:
-            if normalized_input.startswith(safe_url):
-                logging.info(f"✅ URL matched safe list entry: {safe_url}")
+        for safe_domain in safe_domains:
+            # Exact match OR subdomain match
+            if input_domain == safe_domain or input_domain.endswith("." + safe_domain):
+                logging.info(f"✅ URL matched safe list entry: {safe_domain}")
                 return True
 
         logging.info(f"❌ No safe list match for URL: {url}")
